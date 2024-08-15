@@ -1,5 +1,6 @@
 #!/bin/bash
 #
+# Refrence: https://github.com/ZubairLK/mkdebianrfs/blob/master/mkdebianrfs.sh
 # Copyright (c) 2013 Imagination Technologies
 # Author: Alex Smith <alex.smith@imgtec.com>
 #
@@ -31,8 +32,12 @@
 progname="$0"
 
 debian_packages="locales"
-debian_mirror="http://ftp.uk.debian.org/debian/"
+#debian_mirror="http://ftp.uk.debian.org/debian/"
+debian_mirror="$(sudo cat /etc/apt/sources.list | grep "^deb http" | awk ' NR==1 {print $2}')"
 debian_path="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+#target_tar="debian-wheezy-mipsel.tar.bz2"
+target_tar=""
+target_dir="/mnt"
 
 usage() {
     echo "Usage: ${progname} [options...] <arch> <dist> <target>"
@@ -44,19 +49,21 @@ usage() {
     echo
     echo "Options:"
     echo
-    echo "  --tar                Create a tar file instead of installing to a"
+    echo "  --tar=<**tar.bz2>    Create a tar file instead of installing to a"
     echo "                       directory. In this case, <target> specifies"
     echo "                       the name of the output file, which will be"
     echo "                       compressed based on its file extension."
+    echo "  --dir=</mnt>         Target dir to mount rootfs."
     echo "  --include=<packages> Specifies a list (comma separated) of extra"
     echo "                       packages to install in the filesystem."
     echo "  --mirror=<mirror>    URL of Debian mirror to use"
     echo "                       (defaults to ${debian_mirror})."
+    echo "  --dist=<dist>        release version like: wheezy"
+    echo "                       (defaults to ${target_dist})."
     echo
     echo "Example:"
     echo
-    echo "  ${progname} mips wheezy /mnt"
-    echo "  ${progname} --tar mipsel wheezy debian-wheezy-mipsel.tar.bz2"
+    echo "  ${progname} --arch=mips --dist=wheezy --tar=debian-wheezy-mipsel.tar.bz2 --dir=/mnt"
     echo
 }
 
@@ -65,20 +72,35 @@ die() {
     exit 1
 }
 
+prepare_install() {
+    sudo apt-get install binfmt-support qemu qemu-user-static debootstrap -y
+}
+
 while getopts ":h-:" optchar; do
     case "${optchar}" in
     -)
         case "${OPTARG}" in
-        tar)
-            target_tar=1
+        tar=*)
+            target_tar="${OPTARG#*=}"
+            ;;
+	    dir=*)
+            target_dir="${OPTARG#*=}"
             ;;
         include=*)
             debian_packages="${debian_packages},${OPTARG#*=}"
             ;;
-        include)
+        mirror=*)
+            debian_mirror="${OPTARG#*=}"
+            ;;
+        arch=*)
+            target_arch="${OPTARG#*=}"
+            ;;
+        dist=*)
+            target_dist="${OPTARG#*=}"
+            ;;
+        arch | dist | include | dir)
             echo "${progname}: option --${OPTARG} requires an argument." >&2
             usage >&2
-            exit 1
             ;;
         help)
             usage
@@ -104,15 +126,8 @@ while getopts ":h-:" optchar; do
 done
 
 shift $((OPTIND-1))
-if [ $# -ne 3 ]; then
-    echo "${progname}: incorrect number of arguments" >&2
-    usage >&2
-    exit 1
-fi
 
-target_arch="$1"
 [ -z "${target_arch}" ] && die "invalid argument"
-target_dist="$2"
 [ -z "${target_dist}" ] && die "invalid argument"
 
 [ $UID -ne 0 ] && die "must be run as root"
@@ -120,18 +135,16 @@ target_dist="$2"
 
 # QEMU gets copied into /usr/bin in the target filesystem. Need to have
 # binfmt_misc configured to use that path.
-target_qemu=`which qemu-${target_arch}-static`
-[ -z "${target_qemu}" ] && die "cannot find qemu-${target_arch}-static"
-grep -Rq "/usr/bin/qemu-${target_arch}-static" /proc/sys/fs/binfmt_misc/ \
-    2>/dev/null || \
-        die "/usr/bin/qemu-${target_arch}-static not configured with binfmt_misc"
+#target_qemu=`which qemu-${target_arch}-static`
+#[ -z "${target_qemu}" ] && die "cannot find qemu-${target_arch}-static"
+#grep -Rq "/usr/bin/qemu-${target_arch}-static" /proc/sys/fs/binfmt_misc/ \
+#    2>/dev/null || \
+#        die "/usr/bin/qemu-${target_arch}-static not configured with binfmt_misc"
 
-set -e
+#set -e
 
 # If creating a tar file, install to a temporary directory.
 if [ -n "${target_tar}" ]; then
-    target_tar="$3"
-    [ -z "${target_tar}" ] && die "invalid argument"
     tar_dir="${target_tar%.tar*}"
     [ -z "${tar_dir}" -o "${target_tar}" = "${tar_dir}" ] && \
         die "output file name is invalid"
@@ -140,7 +153,7 @@ if [ -n "${target_tar}" ]; then
     target_dir="${tmp_dir}/${tar_dir}"
     mkdir "${target_dir}"
 else
-    target_dir=`readlink -e "$3" || true`
+    target_dir=`readlink -e "$target_dir" || true`
     [ -z "${target_dir}" ] && die "directory '$3' does not exist"
     chown root:root "${target_dir}"
 fi
@@ -166,6 +179,7 @@ echo
 echo "Creating Debian ${target_dist} RFS for ${target_arch} in '${target_dir}'..."
 echo
 
+# first step
 debootstrap --foreign --arch="${target_arch}" --include="${debian_packages}" \
     "${target_dist}" "${target_dir}" "${debian_mirror}"
 
@@ -175,6 +189,7 @@ echo
 
 cp "${target_qemu}" "${target_dir}/usr/bin/qemu-${target_arch}-static"
 
+#second step
 DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true LC_ALL=C \
     LANGUAGE=C LANG=C PATH="${debian_path}" chroot "${target_dir}" \
     /debootstrap/debootstrap --second-stage
@@ -204,9 +219,21 @@ echo "T0:23:respawn:/sbin/getty -L ttyS0 115200 vt100" >> \
 echo "debian" > "${target_dir}/etc/hostname"
 
 # Configure networking.
-echo "auto eth0" >> "${target_dir}/etc/network/interfaces"
-echo "allow-hotplug eth0" >> "${target_dir}/etc/network/interfaces"
-echo "iface eth0 inet dhcp" >> "${target_dir}/etc/network/interfaces"
+if [ -f "${target_dir}/etc/network/interfaces" ];then
+    echo "auto eth0" >> "${target_dir}/etc/network/interfaces"
+    echo "allow-hotplug eth0" >> "${target_dir}/etc/network/interfaces"
+    echo "iface eth0 inet dhcp" >> "${target_dir}/etc/network/interfaces"
+else
+    sudo cat > ${target_dir}/etc/netplan/01-netcfg.yaml <<EOF
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    eth0:
+      dhcp4: true
+      optional: true
+EOF
+fi
 
 # Configure APT.
 sources_list="${target_dir}/etc/apt/sources.list"
