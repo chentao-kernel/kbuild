@@ -34,10 +34,18 @@ progname="$0"
 debian_packages="locales"
 #debian_mirror="http://ftp.uk.debian.org/debian/"
 debian_mirror="$(sudo cat /etc/apt/sources.list | grep "^deb http" | awk ' NR==1 {print $2}')"
+
+if [ -z "$debian_mirror" ];then
+	echo "debian_mirror not found:$debian_mirror, use: http://archive.ubuntu.com/ubuntu/"
+else
+	debian_mirror="http://archive.ubuntu.com/ubuntu/"
+fi
+
 debian_path="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 #target_tar="debian-wheezy-mipsel.tar.bz2"
 target_tar=""
 target_dir="/mnt"
+target_arch="amd64"
 
 usage() {
     echo "Usage: ${progname} [options...] <arch> <dist> <target>"
@@ -63,7 +71,7 @@ usage() {
     echo
     echo "Example:"
     echo
-    echo "  ${progname} --arch=mips --dist=wheezy --tar=debian-wheezy-mipsel.tar.bz2 --dir=/mnt"
+    echo "  ${progname} --arch=amd64 --dist=wheezy --tar=debian-wheezy-amd64.tar.bz2 --dir=/mnt"
     echo
 }
 
@@ -249,11 +257,11 @@ experimental|unstable|sid)
         "${sources_list}"
     echo "deb-src ${debian_mirror} ${target_dist}-updates main" >> \
         "${sources_list}"
-    echo >> "${sources_list}"
-    echo "deb http://security.debian.org/ ${target_dist}/updates main" >> \
-        "${sources_list}"
-    echo "deb-src http://security.debian.org/ ${target_dist}/updates main" >> \
-        "${sources_list}"
+#    echo >> "${sources_list}"
+#    echo "deb http://security.debian.org/ ${target_dist}/updates main" >> \
+#        "${sources_list}"
+#    echo "deb-src http://security.debian.org/ ${target_dist}/updates main" >> \
+#        "${sources_list}"
     ;;
 esac
 
@@ -267,12 +275,41 @@ PATH="${debian_path}" chroot "${target_dir}" /bin/bash
 chroot "${target_dir}" apt-get clean
 rm -f "${target_dir}/usr/bin/qemu-${target_arch}-static"
 
-echo
-
 if [ -n "${target_tar}" ]; then
     echo "Creating ${target_tar}..."
     tar -capf "${target_tar}" -C "${tmp_dir}" "${tar_dir}"
 fi
+
+# Create rootfs img
+echo "Create rootfs img..."
+
+if [ ! -f "rootfs_debian_${target_arch}.ext4" ];then
+    dd if=/dev/zero of=rootfs_debian_${target_arch}.ext4 bs=1M count=10000
+fi
+
+if [ -f "rootfs_debian_${target_arch}.ext4" ];then
+    mkfs.ext4 rootfs_debian_${target_arch}.ext4
+    mkdir -p tmpfs
+    mount -t ext4 rootfs_debian_${target_arch}.ext4 tmpfs/ -o loop
+    cp -af ${target_dir}/* tmpfs/
+
+    # no mount dev, the guest os will panic when mount rootfs
+    # [    3.529263] /dev/root: Can't open blockdev
+    # [    3.530075] VFS: Cannot open root device "/dev/vda" or unknown-block(0,0): error -6
+    # [    3.530291] Please append a correct "root=" boot option; here are the available partitions:
+    # [    3.531027] 0b00         1048575 sr0
+    # refrence: https://www.cnblogs.com/phoebus-ma/p/17437257.html
+    sudo mount -o bind /dev tmpfs/dev
+    sudo mount -o bind /dev/pts tmpfs/dev/pts
+    sudo umount tmpfs/dev/pts
+    sudo umount tmpfs/dev
+
+    umount tmpfs
+    chmod 777 rootfs_debian_${target_arch}.ext4
+else
+    echo "${target_arch} not found"
+fi
+
 
 cleanup
 echo "Done!"
