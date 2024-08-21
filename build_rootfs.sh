@@ -35,9 +35,8 @@ debian_packages="locales"
 #debian_mirror="http://ftp.uk.debian.org/debian/"
 debian_mirror="$(sudo cat /etc/apt/sources.list | grep "^deb http" | awk ' NR==1 {print $2}')"
 
-if [ -z "$debian_mirror" ];then
-	echo "debian_mirror not found:$debian_mirror, use: http://archive.ubuntu.com/ubuntu/"
-else
+if [ -z "${debian_mirror}" ];then
+	echo "debian_mirror not found:${debian_mirror}, use: http://archive.ubuntu.com/ubuntu/"
 	debian_mirror="http://archive.ubuntu.com/ubuntu/"
 fi
 
@@ -227,6 +226,7 @@ echo "T0:23:respawn:/sbin/getty -L ttyS0 115200 vt100" >> \
 echo "debian" > "${target_dir}/etc/hostname"
 
 # Configure networking.
+# Change the interface name eth0 in guest os
 if [ -f "${target_dir}/etc/network/interfaces" ];then
     echo "auto eth0" >> "${target_dir}/etc/network/interfaces"
     echo "allow-hotplug eth0" >> "${target_dir}/etc/network/interfaces"
@@ -235,11 +235,9 @@ else
     sudo cat > ${target_dir}/etc/netplan/01-netcfg.yaml <<EOF
 network:
   version: 2
-  renderer: NetworkManager
   ethernets:
     eth0:
       dhcp4: true
-      optional: true
 EOF
 fi
 
