@@ -39,7 +39,7 @@ while getopts ":h-:" optchar; do
         kernel=*)
             kernel="${OPTARG#*=}"
             ;;
-        roootfs=*)
+        rootfs=*)
             rootfs="${OPTARG#*=}"
             ;;
         arch=*)
