@@ -15,11 +15,12 @@ set -x
 
 #$SUDO_CMD docker rm `sudo docker ps -a -q`
 
-for image in $($SUDO_CMD docker images | grep "kernel-build-container" | awk '{print $3}')
-do
-	echo "rm image:$image"
-	$SUDO_CMD docker rmi $image
-done
+# no need to remove image
+#for image in $($SUDO_CMD docker images | grep "kernel-build-container" | awk '{print $3}')
+#do
+#	echo "rm image:$image"
+#	$SUDO_CMD docker rmi $image
+#done
 
 $SUDO_CMD docker ps -a
 $SUDO_CMD docker image ls

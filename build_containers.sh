@@ -16,25 +16,21 @@ set -e
 CLANG_VERSION=""
 GCC_VERSION=""
 UBUNTU_VERSION=""
+program="$0"
 
 function print_help() {
 	echo "usage: $0 gcc_version/clang_version ubuntu_version"
+	echo
+	echo "Options:"
 	echo "  -g    set gcc version"
 	echo "  -c    set clang version"
 	echo "  -u    set ubuntu versoin"
 	echo "  -h    print this help"
-	echo ""
-	echo "	gcc: 4.9, ubuntu: 16.04"
-	echo "	gcc: 5, ubuntu: 16.04"
-	echo "	gcc: 6, ubuntu: 18.04"
-	echo "	gcc: 7, ubuntu: 20.04"
-	echo "	gcc: 8, ubuntu: 20.04"
-	echo "	gcc: 9, ubuntu: 20.04"
-	echo "	gcc: 10, ubuntu: 20.04"
-	echo "	gcc: 11, ubuntu: 22.04"
-	echo "	gcc: 12, ubuntu: 22.04"
-	echo "	gcc: 13, ubuntu: 23.04"
-	echo "	gcc: 14, ubuntu: 24.04"
+	echo
+	echo "Examples:"
+	echo
+	echo " ${program} -g 13 -c 13 -u 23.04"
+	echo
 }
 
 function build_gcc_container() {
@@ -108,6 +104,19 @@ build_clang_container() {
 		-t kernel-build-container:clang-${CLANG_VERSION} .
 }
 
+build_container() {
+	echo -e "\nBuilding a container with CLANG_VERSION=$1 and GCC_VERSION=$2 from UBUNTU_VERSION=$3"
+	$SUDO_CMD docker build \
+		--file Dockerfile_ubuntu_compile \
+		--build-arg CLANG_VERSION=$1 \
+		--build-arg GCC_VERSION=$2 \
+		--build-arg UBUNTU_VERSION=$3 \
+		--build-arg UNAME=$(id -nu) \
+		--build-arg UID=$(id -u) \
+		--build-arg GID=$(id -g) \
+		-t kernel-build-container:gcc-${GCC_VERSION}-clang-${CLANG_VERSION} .
+}
+
 function build_all_clang_containers() {
 	CLANG_VERSION="12"
 	GCC_VERSION="11"
@@ -160,8 +169,10 @@ function main() {
 	echo "GCC VERSION:$GCC_VERSION,CLANG VERSION:$CLANG_VERSION,UBUNTU VERSION:$UBUNTU_VERSION"
 	if [ -z "$CLANG_VERSION" ];then
 		build_gcc_container ${GCC_VERSION} ${UBUNTU_VERSION}
-	else
+	elif [ -z "$GCC_VERSION" ];then
 		build_clang_container ${CLANG_VERSION} ${GCC_VERSION} ${UBUNTU_VERSION}
+	else
+		build_container ${CLANG_VERSION} ${GCC_VERSION} ${UBUNTU_VERSION}
 	fi
 }
 

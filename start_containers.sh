@@ -1,13 +1,23 @@
 #!/bin/bash
 
+program="$0"
+
 print_help() {
+	echo
 	echo "usage: $0 compiler src_dir out_dir [-n] [-e VAR] [-h] [-v] [-- cmd with args]"
+	echo
+	echo "Options:"
 	echo "  -n    launch container in non-interactive mode"
 	echo "  -e    add environment variable in the container (may be used multiple times)"
 	echo "  -h    print this help"
 	echo "  -v    enable debug output"
-	echo ""
-	echo "  If cmd is empty, we will start an interactive bash in the container."
+	echo "  --    cmd with args,like: make -j 4"
+	echo
+	echo "Examples:"
+	echo
+	echo "${program} gcc-13-clang-13 /home/dylane/code/linux /home/tmp -n -- make -j \$(nproc)"
+	echo
+	echo "If cmd is empty, we will start an interactive bash in the container."
 }
 
 groups | grep docker

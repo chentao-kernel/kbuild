@@ -8,15 +8,24 @@ import argparse
 import subprocess
 import shutil
 import filecmp
+import re
 
-
+examples="""
+Examples:
+    sudo python3 main.py -a x86_64 -k /boot/config-5.15.0-60-generic -s /home/dylane/code/linux -o /home/tmp -c gcc-13-clang-13 -- -j$(nproc)
+"""
 supported_archs = ['x86_64', 'i386', 'arm64', 'arm']
 supported_compilers = ['gcc-4.9', 'gcc-5', 'gcc-6', 'gcc-7', 'gcc-8', 'gcc-9', 'gcc-10', 'gcc-11', 'gcc-12', 'gcc-13',
                        'clang-12', 'clang-13', 'clang-14', 'clang-15',
                        'all']
 
-NAME_DELIMITER = '__'
+NAME_DELIMITER = '-'
 
+def validate_compiler(value):
+    for compiler in supported_compilers:
+        if value.startswith(compiler):
+            return value
+    raise ValueError(f"Invalid compiler: {value}. Must be one of: {', '.join(supported_compilers)}")
 
 def get_cross_compile_args(arch):
     args_list = []
@@ -33,7 +42,7 @@ def get_cross_compile_args(arch):
 
 def finish_building_kernel(out_dir, interrupt):
     print('Finish building the kernel')
-    finish_container_cmd = ['bash', './finish_container.sh']
+    finish_container_cmd = ['bash', './finish_containers.sh']
     if interrupt:
         print('Kill the container and remove the container id file:')
         finish_container_cmd.extend(['kill'])
@@ -55,7 +64,11 @@ def build_kernel(arch, kconfig, src, out, compiler, make_args):
     print('\n=== Building with {} ==='.format(compiler))
 
     if kconfig:
-        suffix = os.path.splitext(os.path.basename(kconfig))[0]
+        # examples:
+        # /boot/config-5.15.0-60-generic
+        # suffix=config-5.15.0-60-generic
+        #suffix = os.path.splitext(os.path.basename(kconfig))[0]
+        suffix = os.path.basename(kconfig)
         if arch in suffix:
             print('Arch name "{}" is already a part of kconfig name'.format(arch))
             out_subdir = out + '/' + suffix + NAME_DELIMITER + compiler
@@ -85,7 +98,7 @@ def build_kernel(arch, kconfig, src, out, compiler, make_args):
     else:
         print('No kconfig to copy to output subdirectory')
 
-    start_container_cmd = ['bash', './start_container.sh', compiler, src, out_subdir]
+    start_container_cmd = ['bash', './start_containers.sh', compiler, src, out_subdir]
 
     noninteractive = True
     if 'menuconfig' in make_args:
@@ -103,6 +116,7 @@ def build_kernel(arch, kconfig, src, out, compiler, make_args):
 
     start_container_cmd.extend(['--', 'make', 'O=../out/'])
 
+    # clang-** container, use clang compile
     if compiler.startswith('clang'):
         print('Compiling with clang requires \'CC=clang\'')
         start_container_cmd.extend(['CC=clang'])
@@ -145,7 +159,8 @@ def build_kernels(arch, kconfig, src, out, compilers, make_args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Build Linux kernel using kernel-build-containers')
+    parser = argparse.ArgumentParser(description='Build Linux kernel using kernel-build-containers',
+                                     epilog=examples)
     parser.add_argument('-a', choices=supported_archs, required=True,
                         help='build target architecture')
     parser.add_argument('-k', metavar='kconfig',
@@ -154,7 +169,7 @@ def main():
                         help='Linux kernel sources directory')
     parser.add_argument('-o', metavar='out', required=True,
                         help='build output directory')
-    parser.add_argument('-c', choices=supported_compilers, required=True,
+    parser.add_argument('-c', type=validate_compiler, required=True,
                         help='building compiler (\'all\' to build with each of them)')
     parser.add_argument('make_args', metavar='...', nargs=argparse.REMAINDER,
                         help='additional arguments for \'make\', can be separated by -- delimiter')
@@ -172,7 +187,7 @@ def main():
     print('[+] Using "{}" as Linux kernel sources directory'.format(args.s))
 
     if not os.path.isdir(args.o):
-        sys.exit('[!] ERROR: can\'t find the build output directory "{}"'.format(args.o))
+        os.makedirs(args.o)
     print('[+] Using "{}" as build output directory'.format(args.o))
 
     compilers = []
