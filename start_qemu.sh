@@ -10,6 +10,7 @@ kernel=""
 rootfs=""
 smp=1
 mem=1024
+debug=""
 
 usage() {
     echo "Usage: ${progname} [options...] <arch> <kernel><smp><mem>"
@@ -25,6 +26,7 @@ usage() {
     echo "  --mem=<mem>         maximum amount of guest memory"
     echo "                      (default:${mem}(1G))"
     echo "  --quit              force quit qemu"
+    echo "  --debug             run with debug mode"
     echo
     echo "Example:"
     echo
@@ -57,6 +59,9 @@ while getopts ":h-:" optchar; do
                 sudo kill -9 $pid
             done
             exit 0
+            ;;
+        debug)
+            debug="-s -S"
             ;;
         arch | kernel | smp | mem | rootfs)
             echo "${progname}: option --${OPTARG} requires an argument." >&2
@@ -94,6 +99,7 @@ if [ -n "${rootfs}" ] && [ -n "${kernel}" ]; then
         -device virtio-blk-pci,drive=hd0 \
         -netdev user,id=mynet \
         -device virtio-net-pci,netdev=mynet \
+        ${debug} \
         #share file from host to guest
         #-fsdev local,id=kmod_dev,path=./kmodules,security_model=none \
         #-device virtio-9p-pci,fsdev=kmod_dev,mount_tag=kmod_mount
