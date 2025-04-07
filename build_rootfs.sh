@@ -70,7 +70,9 @@ usage() {
     echo
     echo "Example:"
     echo
-    echo "  ${progname} --arch=amd64 --dist=wheezy --tar=debian-wheezy-amd64.tar.bz2 --dir=/mnt"
+    echo "sudo bash build_rootfs.sh --arch=amd64 --dist=focal --mirror=http://mirrors.jdcloudcs.com/ubuntu --tar=ubuntu_focal_amd64.tar.bz"
+    echo "sudo bash build_rootfs.sh --arch=arm64 --dist=focal --mirror=https://mirrors.ustc.edu.cn/ubuntu-ports/ --tar=ubuntu_focal_arm64.tar.bz"
+    echo ""
     echo
 }
 
@@ -282,7 +284,7 @@ fi
 echo "Create rootfs img..."
 
 if [ ! -f "rootfs_debian_${target_arch}.ext4" ];then
-    dd if=/dev/zero of=rootfs_debian_${target_arch}.ext4 bs=1M count=10000
+    dd if=/dev/zero of=rootfs_debian_${target_arch}.ext4 bs=1M count=1000
 fi
 
 if [ -f "rootfs_debian_${target_arch}.ext4" ];then
