@@ -1,5 +1,6 @@
 #!/bin/bash
 # refrence: https://www.cnblogs.com/phoebus-ma/p/17437257.html
+# https://blog.csdn.net/weixin_39541632/article/details/129910433
 # Copyright (c) 2024 dylane chen
 # Author: Tao Chen <chen.dylane@gmail.com>
 # test version: QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1)
