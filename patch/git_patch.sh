@@ -219,6 +219,7 @@ function main() {
 			else
                         	git format-patch --subject-prefix="PATCH bpf-next $3" "-$2"
 			fi
+			./scripts/checkpatch.pl --strict *.patch
                         exit 0
                         ;;
                 -P | --pathset)
@@ -228,6 +229,7 @@ function main() {
 			else
                         	git format-patch --subject-prefix="PATCH bpf-next $3" "-$2" --cover-letter -o patchset_$3
 			fi
+			./scripts/checkpatch.pl --strict patchset_$3/*.patch
                         exit 0
                         ;;
                 -h | --help)
