@@ -28,6 +28,7 @@ function print_help ()
         echo "${program} -p 1  v2 submit latest 1 commit with one patch in v2"
         echo "${program} -P 2  submit latest 2 commit with patchset"
 	echo "${program} -P 3  v2 submit latest 3 commit with patchset in v2"
+	echo "${program} -d 20250819215119.37795-1-mykyta.yatsenko5@gmail.com  download patchset from lore.kernel.org"
         echo
 }
 
@@ -204,6 +205,15 @@ function get_email_info() {
         iter_pattern "$@"
 }
 
+function download_patchset() {
+        if which b4; then
+                echo "start download $@"
+                b4 am $@
+        else
+                echo "b4 not found, please apt install b4"
+        fi
+}
+
 function main() {
         while [ $# -gt 0 ]; do
         case $1 in
@@ -230,6 +240,10 @@ function main() {
                         	git format-patch --subject-prefix="PATCH bpf-next $3" "-$2" --cover-letter -o patchset_$3
 			fi
 			./scripts/checkpatch.pl --strict patchset_$3/*.patch
+                        exit 0
+                        ;;
+                -d | --download)
+                        download_patchset "$2"
                         exit 0
                         ;;
                 -h | --help)
